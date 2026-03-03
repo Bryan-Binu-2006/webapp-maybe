@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Batch Details — CertIssuer{% endblock %}
+
+{% block content %}
+<!--
+  batch.html — Certificate batch detail view
+  ============================================
+  Lists every certificate in the batch with download links
+  and verification codes.
+-->
+<div class="batch-container">
+    <h1>Batch Details</h1>
+    <div class="batch-meta">
+        <p><strong>Batch ID:</strong> <span class="mono">{{ batch.id }}</span></p>
+        <p><strong>Template:</strong> {{ batch.template_filename }}</p>
+        <p><strong>Created:</strong> {{ batch.created_at.strftime('%Y-%m-%d %H:%M UTC') }}</p>
+        <p><strong>Total Certificates:</strong> {{ certificates | length }}</p>
+    </div>
+
+    {% if certificates %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Participant Name</th>
+                    <th>Verification Code</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cert in certificates %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ cert.participant_name }}</td>
+                    <td class="mono">
+                        <a href="{{ url_for('verify.verify_certificate', code=cert.verification_code) }}"
+                           target="_blank">
+                            {{ cert.verification_code }}
+                        </a>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('certificates.download_certificate', cert_id=cert.id) }}"
+                           class="btn btn-small">Download</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>No certificates in this batch.</p>
+    {% endif %}
+
+    <div class="batch-actions">
+        <a href="{{ url_for('certificates.dashboard') }}" class="btn">← Back to Dashboard</a>        <a href="{{ url_for('certificates.download_zip', batch_id=batch.id) }}"
+           class="btn btn-primary">Download All (ZIP)</a>    </div>
+</div>
+{% endblock %}

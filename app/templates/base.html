@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<!--
+  base.html — Master layout template
+  ====================================
+  Every page extends this template, which ensures:
+  - Consistent HTML structure
+  - Single place for CSS/JS includes
+  - Autoescaping is ON by default (Jinja2 default) to prevent XSS
+  - CSRF meta tag available for any AJAX POST requests
+  - Flash messages displayed consistently
+
+  SECURITY NOTES:
+  - Jinja2 autoescaping prevents reflected XSS.  Any variable
+    rendered with {{ var }} is HTML-escaped automatically.
+  - The csrf_token() call produces a hidden token for forms.
+  - Content-Security-Policy can be added via Nginx headers.
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}CertIssuer{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <!-- ── Navigation bar ───────────────────────────────────────── -->
+    <nav class="navbar">
+        <div class="nav-brand">
+            <a href="{{ url_for('certificates.dashboard') if session.get('user_id') else url_for('auth.login') }}">
+                🎓 CertIssuer
+            </a>
+        </div>
+        <div class="nav-links">
+            {% if session.get('user_id') %}
+                <span class="nav-user">{{ session.get('username', '') }}</span>
+                <a href="{{ url_for('certificates.dashboard') }}">Dashboard</a>
+                <a href="{{ url_for('certificates.upload') }}">New Batch</a>
+                <a href="{{ url_for('verify.verify_page') }}">Verify</a>
+                <a href="{{ url_for('auth.logout') }}" class="btn-logout">Logout</a>
+            {% else %}
+                <a href="{{ url_for('auth.login') }}">Login</a>
+                <a href="{{ url_for('auth.register') }}">Register</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <!-- ── Flash messages (success / error / warning / info) ────── -->
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                        <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- ── Page content (filled by child templates) ─────────── -->
+        {% block content %}{% endblock %}
+    </div>
+
+    <!-- ── Footer ───────────────────────────────────────────────── -->
+    <footer class="footer">
+        <p>CertIssuer &mdash; Secure Certificate Generation</p>
+    </footer>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

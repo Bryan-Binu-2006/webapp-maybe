@@ -1,0 +1,64 @@
+# ============================================================================
+# systemd Service File for CertIssuer
+# ============================================================================
+# Location: /etc/systemd/system/certissuer.service
+#
+# After placing this file:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable certissuer
+#   sudo systemctl start certissuer
+#   sudo systemctl status certissuer
+#
+# WHY systemd?
+# - Automatically restarts the app if it crashes.
+# - Starts the app on boot.
+# - Captures logs via journalctl.
+# - Runs the app as a non-root user (security).
+# ============================================================================
+
+[Unit]
+Description=CertIssuer — Secure Certificate Generation Web App
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+# ── Run as a dedicated non-root user ───────────────────────────────
+# SECURITY: Never run web apps as root.  If the app is compromised,
+# the attacker only gets the privileges of this user.
+User=ubuntu
+Group=ubuntu
+
+# ── Working directory ──────────────────────────────────────────────
+WorkingDirectory=/home/ubuntu/certissuer
+
+# ── Environment variables ──────────────────────────────────────────
+Environment="FLASK_ENV=production"
+# Keep secrets out of this unit file.
+# Create /etc/certissuer/certissuer.env with mode 600.
+EnvironmentFile=/etc/certissuer/certissuer.env
+
+# ── Start command ──────────────────────────────────────────────────
+ExecStart=/home/ubuntu/certissuer/venv/bin/gunicorn \
+    -c deploy/gunicorn.conf.py \
+    wsgi:application
+
+# ── Restart policy ─────────────────────────────────────────────────
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+UMask=027
+LimitNOFILE=4096
+
+# ── Security hardening ─────────────────────────────────────────────
+# These systemd options add extra isolation.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

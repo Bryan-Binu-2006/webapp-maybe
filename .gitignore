@@ -1,0 +1,44 @@
+# ============================================================================
+# .gitignore — Files that should NOT be committed to version control
+# ============================================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment variables (NEVER commit secrets)
+.env
+
+# Uploaded files and generated certificates
+storage/
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Personal documentation
+PROJECT_DEEP_DIVE.txt
+app/EC2_DEPLOY_TUTORIAL.txt
+
+# Security audit documentation (internal review only)
+SECURITY_AUDIT/

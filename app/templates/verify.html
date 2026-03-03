@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Verify Certificate — CertIssuer{% endblock %}
+
+{% block content %}
+<!--
+  verify.html — Public certificate verification page
+  =====================================================
+  Accessible WITHOUT login.  Shows whether a certificate
+  with the given verification code exists.
+
+  SECURITY NOTES:
+  - Only the participant name, issue date, and issuer username
+    are shown.
+  - No internal IDs, file paths, or sensitive info are exposed.
+-->
+<div class="verify-container">
+    <h1>Certificate Verification</h1>
+
+    {% if valid is true and certificate %}
+        <div class="verify-result valid">
+            <div class="verify-icon">&#x2705;</div>
+            <h2>Valid Certificate</h2>
+            <div class="verify-details">
+                <p><strong>Participant:</strong> {{ certificate.participant_name }}</p>
+                <p><strong>Issued:</strong> {{ certificate.created_at.strftime('%Y-%m-%d') }}</p>
+                <p><strong>Issued By:</strong> {{ certificate.owner.username }}</p>
+                <p><strong>Verification Code:</strong>
+                    <span class="mono">{{ certificate.verification_code }}</span>
+                </p>
+            </div>
+        </div>
+    {% elif valid is false %}
+        <div class="verify-result invalid">
+            <div class="verify-icon">&#x274C;</div>
+            <h2>Invalid Certificate</h2>
+            <p>No certificate was found with this verification code.</p>
+            <p>Please check the code and try again.</p>
+        </div>
+    {% endif %}
+
+    <!-- Manual verification form -->
+    <div class="verify-form">
+        <h3>Verify a Certificate</h3>
+        <form method="GET" action="" id="verifyForm">
+            <div class="form-group">
+                <label for="code">Verification Code (UUID)</label>
+                <input type="text" id="code" name="code"
+                       placeholder="e.g. 3fa85f64-5717-4562-b3fc-2c963f66afa6">
+            </div>
+            <button type="submit" class="btn btn-primary">Verify</button>
+        </form>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+    // Minimal JS: redirect to /verify/<code> on form submit
+    document.getElementById('verifyForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var code = document.getElementById('code').value.trim();
+        if (code) {
+            window.location.href = '/verify/' + encodeURIComponent(code);
+        }
+    });
+</script>
+{% endblock %}
+{% endblock %}

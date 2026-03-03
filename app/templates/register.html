@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Register — CertIssuer{% endblock %}
+
+{% block content %}
+<!--
+  register.html — Registration form
+  ===================================
+  SECURITY NOTES:
+  - CSRF token included.
+  - Client-side validation (minlength, required) provides UX
+    feedback, but ALL validation is ALSO done server-side because
+    client-side checks can be bypassed.
+  - Password confirmation prevents typos.
+-->
+<div class="auth-container">
+    <h1>Register</h1>
+    <form method="POST" action="{{ url_for('auth.register') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username"
+                   required minlength="3" maxlength="80"
+                   autocomplete="username"
+                   placeholder="Choose a username (3+ chars)">
+        </div>
+
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password"
+                   required minlength="8"
+                   autocomplete="new-password"
+                   placeholder="At least 8 characters">
+        </div>
+
+        <div class="form-group">
+            <label for="confirm_password">Confirm Password</label>
+            <input type="password" id="confirm_password" name="confirm_password"
+                   required minlength="8"
+                   autocomplete="new-password"
+                   placeholder="Re-enter your password">
+        </div>
+
+        <button type="submit" class="btn btn-primary">Register</button>
+    </form>
+
+    <p class="auth-link">
+        Already have an account?
+        <a href="{{ url_for('auth.login') }}">Login here</a>
+    </p>
+</div>
+{% endblock %}

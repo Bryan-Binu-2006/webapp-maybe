@@ -1,0 +1,253 @@
+{% extends "base.html" %}
+{% block title %}Generating Certificates - CertIssuer{% endblock %}
+
+{% block extra_head %}
+<style>
+.progress-container {
+    max-width: 580px;
+    margin: 3rem auto;
+    text-align: center;
+}
+.progress-card {
+    background: var(--bg-card);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    border: 1px solid var(--border);
+    padding: 2.5rem 2rem;
+    margin-bottom: 1.5rem;
+}
+.progress-card h1 {
+    font-size: 1.5rem;
+    margin-bottom: 0.35rem;
+}
+.progress-subtitle {
+    color: var(--text-light);
+    font-size: 0.92rem;
+    margin-bottom: 2rem;
+}
+
+/* Spinner */
+.spinner {
+    width: 48px; height: 48px;
+    border: 4px solid var(--border);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1.5rem;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Indeterminate progress bar */
+.progress-bar-wrap {
+    background: var(--bg);
+    border-radius: 999px;
+    height: 18px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    border: 1px solid var(--border);
+    position: relative;
+}
+.progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), #60a5fa);
+    border-radius: 999px;
+    width: 30%;
+    position: absolute;
+    animation: indeterminate 1.8s ease-in-out infinite;
+}
+@keyframes indeterminate {
+    0%   { left: -30%; }
+    100% { left: 100%; }
+}
+.progress-bar-fill.done {
+    animation: none;
+    left: 0;
+    width: 100%;
+    transition: width 0.4s ease;
+}
+
+/* Stats row */
+.stats-row {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+}
+.stat-item {
+    text-align: center;
+}
+.stat-value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--primary);
+    font-family: "SF Mono", "Fira Code", monospace;
+}
+.stat-label {
+    font-size: 0.78rem;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* Done state */
+.progress-card.done {
+    border-color: var(--success);
+    border-width: 2px;
+}
+.progress-card.done .stat-value {
+    color: var(--success);
+}
+.progress-card.error {
+    border-color: var(--danger, #ef4444);
+    border-width: 2px;
+}
+.progress-actions {
+    margin-top: 1.5rem;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.hint-text {
+    color: var(--text-light);
+    font-size: 0.82rem;
+    margin-top: 1rem;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="progress-container">
+    <div class="progress-card" id="progressCard">
+        <!-- Spinner (hidden when done) -->
+        <div class="spinner" id="spinner"></div>
+
+        <h1 id="mainTitle">Generating Certificates...</h1>
+        <p class="progress-subtitle" id="subTitle">
+            Creating {{ cert_count }} certificate{{ 's' if cert_count != 1 else '' }}.
+            You can switch tabs &mdash; this will keep running.
+        </p>
+
+        <!-- Progress bar (indeterminate) -->
+        <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="progressBar"></div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-row">
+            <div class="stat-item">
+                <div class="stat-value" id="certCountVal">{{ cert_count }}</div>
+                <div class="stat-label">Certificates</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="elapsedVal">0s</div>
+                <div class="stat-label">Elapsed</div>
+            </div>
+            <div class="stat-item">
+                <div class="stat-value" id="etaVal">~{{ (cert_count * 0.8)|round|int }}s</div>
+                <div class="stat-label">Est. Time</div>
+            </div>
+        </div>
+
+        <!-- Actions (shown when done) -->
+        <div class="progress-actions" id="doneActions" style="display:none;">
+            <a href="{{ url_for('certificates.view_batch', batch_id=batch.id) }}"
+               class="btn btn-primary">View Certificates</a>
+            <a href="{{ url_for('certificates.download_zip', batch_id=batch.id) }}"
+               class="btn">Download ZIP</a>
+            <a href="{{ url_for('certificates.dashboard') }}"
+               class="btn">Dashboard</a>
+        </div>
+
+        <p class="hint-text" id="hintText">
+            Feel free to switch tabs. Generation continues in this request.
+        </p>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    "use strict";
+
+    var GENERATE_URL = "{{ url_for('certificates.do_generate', batch_id=batch.id) }}";
+    var VIEW_URL     = "{{ url_for('certificates.view_batch', batch_id=batch.id) }}";
+    var CSRF_TOKEN   = "{{ csrf_token() }}";
+
+    var bar         = document.getElementById("progressBar");
+    var elapsedVal  = document.getElementById("elapsedVal");
+    var etaVal      = document.getElementById("etaVal");
+    var spinner     = document.getElementById("spinner");
+    var mainTitle   = document.getElementById("mainTitle");
+    var subTitle    = document.getElementById("subTitle");
+    var card        = document.getElementById("progressCard");
+    var doneActions = document.getElementById("doneActions");
+    var hintText    = document.getElementById("hintText");
+    var elapsedTimer = null;
+    var startTime    = Date.now();
+
+    function fmtTime(seconds) {
+        if (seconds <= 0 || !isFinite(seconds)) return "--";
+        var s = Math.round(seconds);
+        if (s < 60) return s + "s";
+        var m = Math.floor(s / 60);
+        var sec = s % 60;
+        return m + "m " + (sec < 10 ? "0" : "") + sec + "s";
+    }
+
+    // Live elapsed counter
+    elapsedTimer = setInterval(function () {
+        var elapsed = (Date.now() - startTime) / 1000;
+        elapsedVal.textContent = fmtTime(elapsed);
+    }, 1000);
+
+    // Fire the synchronous generation request
+    fetch(GENERATE_URL, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": CSRF_TOKEN,
+        },
+        body: "{}",
+    })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+    .then(function (result) {
+        clearInterval(elapsedTimer);
+        var d = result.data;
+        var elapsed = (Date.now() - startTime) / 1000;
+        elapsedVal.textContent = fmtTime(elapsed);
+
+        spinner.style.display = "none";
+        bar.classList.add("done");
+        doneActions.style.display = "flex";
+        hintText.style.display = "none";
+        etaVal.textContent = fmtTime(elapsed);
+
+        if (!result.ok || d.error) {
+            card.classList.add("error");
+            mainTitle.textContent = "Generation Error";
+            subTitle.textContent = d.error || "An unexpected error occurred.";
+        } else {
+            card.classList.add("done");
+            mainTitle.innerHTML = "&#10003; All Done!";
+            subTitle.textContent = d.count + " certificate" + (d.count !== 1 ? "s" : "") +
+                " generated in " + fmtTime(d.elapsed) + ".";
+            document.getElementById("certCountVal").textContent = d.count;
+        }
+    })
+    .catch(function (err) {
+        clearInterval(elapsedTimer);
+        spinner.style.display = "none";
+        card.classList.add("error");
+        mainTitle.textContent = "Connection Error";
+        subTitle.textContent = "Lost connection to the server. Please try again.";
+        doneActions.style.display = "flex";
+        hintText.style.display = "none";
+    });
+
+})();
+</script>
+{% endblock %}

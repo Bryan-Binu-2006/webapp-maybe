@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Login — CertIssuer{% endblock %}
+
+{% block content %}
+<!--
+  login.html — Login form
+  ========================
+  SECURITY NOTES:
+  - The form includes a CSRF token (csrf_token()).
+    Without this, an attacker could trick a logged-in user
+    into submitting a forged form from another site.
+  - Passwords are sent over HTTPS (enforced by Nginx + Secure cookie).
+  - Error messages are generic ("Invalid username or password")
+    to prevent username enumeration.
+-->
+<div class="auth-container">
+    <h1>Login</h1>
+    <form method="POST" action="{{ url_for('auth.login') }}">
+        <!-- CSRF token — required for every POST form -->
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username"
+                   required minlength="3" maxlength="80"
+                   autocomplete="username"
+                   placeholder="Enter your username">
+        </div>
+
+        <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password"
+                   required minlength="8"
+                   autocomplete="current-password"
+                   placeholder="Enter your password">
+        </div>
+
+        <button type="submit" class="btn btn-primary">Login</button>
+    </form>
+
+    <p class="auth-link">
+        Don't have an account?
+        <a href="{{ url_for('auth.register') }}">Register here</a>
+    </p>
+</div>
+{% endblock %}

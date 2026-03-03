@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Upload Files — CertIssuer{% endblock %}
+
+{% block content %}
+<!--
+  upload.html — File upload form (Step 1)
+  ========================================
+  SECURITY NOTES:
+  - enctype="multipart/form-data" is required for file uploads.
+  - accept=".png" and accept=".xlsx" provide a UX hint to the
+    browser file picker, but server-side validation is the real
+    enforcement.
+  - CSRF token is included.
+-->
+<div class="upload-container">
+    <h1>Step 1: Upload Files</h1>
+    <p class="subtitle">Upload your certificate template (PNG) and participant list (Excel .xlsx).</p>
+
+    <form method="POST"
+          action="{{ url_for('certificates.upload') }}"
+          enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+        <div class="form-group">
+            <label for="template">Certificate Template (PNG, max 5 MB)</label>
+            <input type="file" id="template" name="template"
+                   accept=".png" required>
+            <small class="form-help">
+                Upload a PNG image that will be used as the certificate background.
+            </small>
+        </div>
+
+        <div class="form-group">
+            <label for="excel">Participant List (Excel .xlsx, max 2 MB)</label>
+            <input type="file" id="excel" name="excel"
+                   accept=".xlsx" required>
+            <small class="form-help">
+                First row must contain column headers.
+                Maximum 300 participants per batch.
+            </small>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Upload & Continue</button>
+    </form>
+</div>
+{% endblock %}

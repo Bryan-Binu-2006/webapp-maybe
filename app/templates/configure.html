@@ -1,0 +1,649 @@
+{% extends "base.html" %}
+{% block title %}Configure Certificates — CertIssuer{% endblock %}
+
+{% block extra_head %}
+<!-- Google Fonts for the visual editor -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Playfair+Display:wght@400;700&family=Montserrat:wght@400;600;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600;700&family=Lora:wght@400;700&family=Poppins:wght@400;600;700&family=Raleway:wght@400;600;700&family=Great+Vibes&family=Dancing+Script:wght@400;700&family=Merriweather:wght@400;700&family=Oswald:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── Visual Editor Layout ──────────────────────────────────────── */
+.editor-wrapper {
+    display: flex;
+    gap: 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+.editor-main { flex: 1; min-width: 0; }
+.editor-sidebar { width: 320px; flex-shrink: 0; }
+.editor-title { margin-bottom: 0.5rem; font-size: 1.4rem; }
+.editor-subtitle { color: var(--text-light); margin-bottom: 1.25rem; font-size: 0.9rem; }
+
+/* ── Canvas Area ───────────────────────────────────────────────── */
+.canvas-container {
+    position: relative;
+    background: #e5e7eb;
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 2px solid var(--border);
+    cursor: crosshair;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.canvas-container img.template-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    pointer-events: none;
+}
+
+/* ── Center Snap Guide Lines (Canva-style) ─────────────────────── */
+.guide-line {
+    position: absolute;
+    background: #f43f5e;
+    z-index: 8;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.guide-line.visible { opacity: 1; }
+.guide-h { left: 0; right: 0; height: 1px; }
+.guide-v { top: 0; bottom: 0; width: 1px; }
+
+/* ── Draggable + Resizable Placeholder ─────────────────────────── */
+.name-placeholder {
+    position: absolute;
+    cursor: grab;
+    white-space: nowrap;
+    pointer-events: auto;
+    padding: 2px 6px;
+    border: 2px dashed var(--primary);
+    border-radius: 4px;
+    background: rgba(37, 99, 235, 0.08);
+    transition: box-shadow 0.15s;
+    z-index: 10;
+    line-height: 1.2;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 40px;
+    min-height: 20px;
+    overflow: hidden;
+}
+.name-placeholder:hover { box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2); }
+.name-placeholder.dragging {
+    cursor: grabbing;
+    border-color: var(--primary-dark);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.name-placeholder.snapped-h { border-top-color: #f43f5e; border-bottom-color: #f43f5e; }
+.name-placeholder.snapped-v { border-left-color: #f43f5e; border-right-color: #f43f5e; }
+
+/* Resize handles */
+.resize-handle {
+    position: absolute;
+    background: var(--primary);
+    border: 1.5px solid #fff;
+    border-radius: 2px;
+    z-index: 15;
+    pointer-events: auto;
+}
+.resize-handle-r  { width: 8px; height: 16px; right: -5px; top: 50%; transform: translateY(-50%); cursor: ew-resize; }
+.resize-handle-b  { height: 8px; width: 16px; bottom: -5px; left: 50%; transform: translateX(-50%); cursor: ns-resize; }
+.resize-handle-br { width: 10px; height: 10px; right: -6px; bottom: -6px; cursor: nwse-resize; border-radius: 3px; }
+
+/* Coordinate & dimension badge */
+.coord-badge {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(0,0,0,0.65); color: #fff;
+    font-size: 0.72rem; padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    font-family: "SF Mono", "Fira Code", monospace;
+    pointer-events: none; z-index: 20;
+}
+.canvas-hint {
+    position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.65); color: #fff;
+    font-size: 0.78rem; padding: 0.35rem 0.85rem;
+    border-radius: 20px; pointer-events: none; z-index: 20;
+    opacity: 1; transition: opacity 0.5s;
+}
+.canvas-hint.hidden { opacity: 0; }
+
+/* ── Sidebar ───────────────────────────────────────────────────── */
+.sidebar-card {
+    background: var(--bg-card); border-radius: var(--radius);
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+    padding: 1.25rem; margin-bottom: 1rem;
+}
+.sidebar-card h3 {
+    font-size: 0.95rem; margin-bottom: 1rem;
+    padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+}
+.sidebar-card .form-group { margin-bottom: 1rem; }
+.sidebar-card .form-group:last-child { margin-bottom: 0; }
+.sidebar-card label { display: block; font-weight: 600; margin-bottom: 0.3rem; font-size: 0.82rem; }
+.sidebar-card input, .sidebar-card select {
+    width: 100%; padding: 0.5rem 0.65rem;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    font-size: 0.88rem; color: var(--text); background: var(--bg-card);
+    transition: border-color 0.2s;
+}
+.sidebar-card input:focus, .sidebar-card select:focus {
+    outline: none; border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.sidebar-card input[type="color"] { height: 38px; padding: 0.2rem; cursor: pointer; }
+.sidebar-card input[type="range"] { padding: 0; border: none; box-shadow: none; accent-color: var(--primary); }
+.range-row { display: flex; align-items: center; gap: 0.6rem; }
+.range-row input[type="range"] { flex: 1; }
+.range-value {
+    font-size: 0.82rem; font-family: "SF Mono", "Fira Code", monospace;
+    color: var(--text-light); min-width: 32px; text-align: right;
+}
+
+/* ── Preview Card ──────────────────────────────────────────────── */
+.preview-card {
+    background: var(--bg-card); border-radius: var(--radius);
+    border: 1px solid var(--border); box-shadow: var(--shadow);
+    padding: 1.25rem; margin-bottom: 1rem;
+}
+.preview-card h3 {
+    font-size: 0.95rem; margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+}
+.preview-mini {
+    position: relative; background: #f1f5f9;
+    border-radius: 6px; overflow: hidden;
+    border: 1px solid var(--border);
+}
+.preview-mini img { display: block; width: 100%; height: auto; }
+.preview-name {
+    position: absolute; white-space: nowrap;
+    pointer-events: none; line-height: 1.2;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────── */
+/* ── Alignment toggle buttons ──────────────────────────────────── */
+.align-group { display: flex; gap: 4px; }
+.align-btn {
+    flex: 1; padding: 0.45rem 0; border: 1px solid var(--border);
+    border-radius: var(--radius); background: var(--bg-card);
+    cursor: pointer; font-size: 1rem; color: var(--text-light);
+    transition: all 0.15s; text-align: center; line-height: 1;
+}
+.align-btn:hover { border-color: var(--primary); color: var(--primary); }
+.align-btn.active {
+    background: var(--primary); color: #fff;
+    border-color: var(--primary);
+}
+
+.btn-generate {
+    width: 100%; padding: 0.75rem; font-size: 1rem; font-weight: 600;
+    background: var(--primary); color: #fff; border: none;
+    border-radius: var(--radius); cursor: pointer; transition: background 0.2s;
+}
+.btn-generate:hover { background: var(--primary-dark); }
+
+/* ── Responsive ────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+    .editor-wrapper { flex-direction: column; }
+    .editor-sidebar { width: 100%; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="editor-wrapper">
+    <!-- MAIN CANVAS -->
+    <div class="editor-main">
+        <h1 class="editor-title">Step 2: Position Your Text</h1>
+        <p class="editor-subtitle">
+            Drag &amp; resize the name placeholder. Center guides appear when aligned.
+        </p>
+
+        <div class="canvas-container" id="canvasContainer">
+            <img id="templateImg" class="template-img"
+                 src="{{ url_for('certificates.template_preview') }}"
+                 alt="Certificate Template" draggable="false">
+
+            <!-- Center snap guide lines -->
+            <div class="guide-line guide-h" id="guideH"></div>
+            <div class="guide-line guide-v" id="guideV"></div>
+
+            <!-- Draggable + resizable placeholder -->
+            <div class="name-placeholder" id="namePlaceholder">
+                <span id="phText">John Doe</span>
+                <div class="resize-handle resize-handle-r"  id="resizeR"></div>
+                <div class="resize-handle resize-handle-b"  id="resizeB"></div>
+                <div class="resize-handle resize-handle-br" id="resizeBR"></div>
+            </div>
+
+            <div class="coord-badge" id="coordBadge">X: 100  Y: 100</div>
+            <div class="canvas-hint" id="canvasHint">
+                Drag to position &bull; Use corner handles to resize &bull; Click anywhere to move
+            </div>
+        </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="editor-sidebar">
+        <form method="POST" action="{{ url_for('certificates.configure') }}" id="configForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" id="text_x" name="text_x" value="100">
+            <input type="hidden" id="text_y" name="text_y" value="100">
+            <input type="hidden" id="text_area_width" name="text_area_width" value="0">
+
+            <!-- Column selection -->
+            <div class="sidebar-card">
+                <h3>Name Column</h3>
+                <div class="form-group">
+                    <label for="column_index">Select the column with names</label>
+                    <select id="column_index" name="column_index" required>
+                        {% for header in headers %}
+                            <option value="{{ loop.index0 }}">{{ header }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Font settings -->
+            <div class="sidebar-card">
+                <h3>Font &amp; Style</h3>
+
+                <!-- Font family -->
+                <div class="form-group">
+                    <label for="font_family">Font Family</label>
+                    <select id="font_family" name="font_family">
+                        <option value="Inter"             style="font-family:'Inter'">Inter (Clean Modern)</option>
+                        <option value="Roboto"            style="font-family:'Roboto'">Roboto (Universal)</option>
+                        <option value="Open Sans"         style="font-family:'Open Sans'">Open Sans (Friendly)</option>
+                        <option value="Montserrat"        style="font-family:'Montserrat'">Montserrat (Bold)</option>
+                        <option value="Poppins"           style="font-family:'Poppins'">Poppins (Geometric)</option>
+                        <option value="Raleway"           style="font-family:'Raleway'">Raleway (Elegant)</option>
+                        <option value="Playfair Display"  style="font-family:'Playfair Display'">Playfair Display (Serif)</option>
+                        <option value="Lora"              style="font-family:'Lora'">Lora (Classic Serif)</option>
+
+                        <option value="Oswald"            style="font-family:'Oswald'">Oswald (Condensed)</option>
+                        <option value="Great Vibes"       style="font-family:'Great Vibes'">Great Vibes (Script)</option>
+                        <option value="Dancing Script"    style="font-family:'Dancing Script'">Dancing Script (Handwritten)</option>
+                    </select>
+                </div>
+
+                <!-- Font size -->
+                <div class="form-group">
+                    <label for="font_size_range">Font Size</label>
+                    <div class="range-row">
+                        <input type="range" id="font_size_range" min="8" max="200" value="40">
+                        <span class="range-value" id="fontSizeDisplay">40pt</span>
+                    </div>
+                    <input type="hidden" id="font_size" name="font_size" value="40">
+                </div>
+
+                <!-- Font color -->
+                <div class="form-group">
+                    <label for="font_color">Font Color</label>
+                    <input type="color" id="font_color" name="font_color" value="#000000">
+                </div>
+
+                <!-- Text alignment -->
+                <div class="form-group">
+                    <label>Text Alignment</label>
+                    <div class="align-group">
+                        <button type="button" class="align-btn" data-align="left" title="Left">&#9664;</button>
+                        <button type="button" class="align-btn active" data-align="center" title="Center">&#9670;</button>
+                        <button type="button" class="align-btn" data-align="right" title="Right">&#9654;</button>
+                    </div>
+                    <input type="hidden" id="text_align" name="text_align" value="center">
+                </div>
+            </div>
+
+            <!-- Mini preview -->
+            <div class="preview-card">
+                <h3>Live Preview</h3>
+                <div class="preview-mini" id="previewMini">
+                    <img src="{{ url_for('certificates.template_preview') }}"
+                         alt="Preview" draggable="false">
+                    <span class="preview-name" id="previewName">John Doe</span>
+                </div>
+            </div>
+
+            <button type="submit" class="btn-generate">Generate Certificates</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    "use strict";
+
+    /* ── DOM REFS ──────────────────────────────────────────────── */
+    var container   = document.getElementById("canvasContainer");
+    var templateImg = document.getElementById("templateImg");
+    var placeholder = document.getElementById("namePlaceholder");
+    var phText      = document.getElementById("phText");
+    var coordBadge  = document.getElementById("coordBadge");
+    var canvasHint  = document.getElementById("canvasHint");
+    var guideH      = document.getElementById("guideH");
+    var guideV      = document.getElementById("guideV");
+
+    var inputX      = document.getElementById("text_x");
+    var inputY      = document.getElementById("text_y");
+    var fontRange   = document.getElementById("font_size_range");
+    var fontHidden  = document.getElementById("font_size");
+    var fontDisplay = document.getElementById("fontSizeDisplay");
+    var fontColor   = document.getElementById("font_color");
+    var fontFamily  = document.getElementById("font_family");
+    var textAlignInput = document.getElementById("text_align");
+    var textAreaWidthInput = document.getElementById("text_area_width");
+    var alignBtns   = document.querySelectorAll(".align-btn");
+
+    var previewMini = document.getElementById("previewMini");
+    var previewName = document.getElementById("previewName");
+
+    var resizeR  = document.getElementById("resizeR");
+    var resizeB  = document.getElementById("resizeB");
+    var resizeBR = document.getElementById("resizeBR");
+
+    /* ── STATE ─────────────────────────────────────────────────── */
+    var realX = 100, realY = 100;
+    var naturalW = 1, naturalH = 1;
+    var isDragging = false, isResizing = false;
+    var dragOffsetX = 0, dragOffsetY = 0;
+    var hintHidden = false;
+    var resizeAxis = "";
+    var resizeStartW = 0, resizeStartH = 0, resizeStartMX = 0, resizeStartMY = 0;
+    var boxExtraW = 0, boxExtraH = 0;
+    var SNAP_PX = 8;
+
+    /* ── IMAGE LOAD ────────────────────────────────────────────── */
+    function onImgReady() {
+        naturalW = templateImg.naturalWidth;
+        naturalH = templateImg.naturalHeight;
+        realX = Math.round(naturalW * 0.3);
+        realY = Math.round(naturalH * 0.45);
+        updateAllViews();
+    }
+    templateImg.addEventListener("load", onImgReady);
+    if (templateImg.complete && templateImg.naturalWidth > 0) onImgReady();
+
+    /* ── COORDINATE HELPERS ────────────────────────────────────── */
+    function getScale() {
+        var r = templateImg.getBoundingClientRect();
+        return { sx: r.width / naturalW, sy: r.height / naturalH, r: r };
+    }
+    function realToDisplay(rx, ry) {
+        var s = getScale();
+        return { x: rx * s.sx, y: ry * s.sy };
+    }
+    function displayToReal(dx, dy) {
+        var s = getScale();
+        return { x: Math.round(dx * (naturalW / s.r.width)),
+                 y: Math.round(dy * (naturalH / s.r.height)) };
+    }
+    function getDisplayFontSize() {
+        var s = getScale();
+        return Math.max(10, Math.round(parseInt(fontHidden.value) * s.sx));
+    }
+
+    /* ── CENTER SNAP GUIDES ────────────────────────────────────── */
+    function updateGuides() {
+        var s = getScale();
+        var imgRect = s.r;
+        var phRect  = placeholder.getBoundingClientRect();
+
+        var imgCX = imgRect.width / 2;
+        var imgCY = imgRect.height / 2;
+
+        /* Vertical centre: visual centre of the placeholder */
+        var phCY = (phRect.top - imgRect.top) + phRect.height / 2;
+        if (Math.abs(phCY - imgCY) < SNAP_PX) {
+            guideH.style.top = imgCY + "px";
+            guideH.classList.add("visible");
+            placeholder.classList.add("snapped-h");
+        } else {
+            guideH.classList.remove("visible");
+            placeholder.classList.remove("snapped-h");
+        }
+
+        /* Horizontal centre: check box centre against image centre */
+        var phCX = (phRect.left - imgRect.left) + phRect.width / 2;
+        if (Math.abs(phCX - imgCX) < SNAP_PX) {
+            guideV.style.left = imgCX + "px";
+            guideV.classList.add("visible");
+            placeholder.classList.add("snapped-v");
+        } else {
+            guideV.classList.remove("visible");
+            placeholder.classList.remove("snapped-v");
+        }
+    }
+
+    /* ── UPDATE ALL VIEWS ──────────────────────────────────────── */
+    function updateAllViews() {
+        realX = Math.max(0, Math.min(realX, naturalW));
+        realY = Math.max(0, Math.min(realY, naturalH));
+
+        inputX.value = realX;
+        inputY.value = realY;
+
+        var dp = realToDisplay(realX, realY);
+        placeholder.style.left = dp.x + "px";
+        placeholder.style.top  = dp.y + "px";
+
+        var displayFS = getDisplayFontSize();
+        placeholder.style.fontSize   = displayFS + "px";
+        placeholder.style.color      = fontColor.value;
+        placeholder.style.fontFamily = "'" + fontFamily.value + "', sans-serif";
+
+        // Text alignment — X,Y is always the top-left of the box.
+        // Text is centred WITHIN the box via flexbox justify-content.
+        var align = textAlignInput.value;
+        if (align === "center") {
+            placeholder.style.justifyContent = "center";
+        } else if (align === "right") {
+            placeholder.style.justifyContent = "flex-end";
+        } else {
+            placeholder.style.justifyContent = "flex-start";
+        }
+        placeholder.style.transform = ""; // never shift the box
+
+        if (boxExtraW > 0) {
+            var s1 = getScale();
+            placeholder.style.width = (boxExtraW * s1.sx) + "px";
+            textAreaWidthInput.value = Math.round(boxExtraW);
+        } else {
+            placeholder.style.width = "";
+            textAreaWidthInput.value = "0";
+        }
+        if (boxExtraH > 0) {
+            var s2 = getScale();
+            placeholder.style.height = (boxExtraH * s2.sy) + "px";
+        } else {
+            placeholder.style.height = "";
+        }
+
+        coordBadge.textContent = "X: " + realX + "   Y: " + realY;
+        updateGuides();
+        updateMiniPreview();
+    }
+
+    function updateMiniPreview() {
+        var miniImg = previewMini.querySelector("img");
+        if (!miniImg.complete || miniImg.naturalWidth === 0) return;
+
+        var miniRect = miniImg.getBoundingClientRect();
+        var miniContainerRect = previewMini.getBoundingClientRect();
+        var scaleX = miniRect.width / naturalW;
+        var scaleY = miniRect.height / naturalH;
+
+        previewName.style.left = (realX * scaleX + (miniRect.left - miniContainerRect.left)) + "px";
+        previewName.style.top  = (realY * scaleY + (miniRect.top  - miniContainerRect.top )) + "px";
+
+        var miniFontSize = Math.max(6, Math.round(parseInt(fontHidden.value) * scaleX));
+        previewName.style.fontSize   = miniFontSize + "px";
+        previewName.style.color      = fontColor.value;
+        previewName.style.fontFamily = "'" + fontFamily.value + "', sans-serif";
+        previewName.style.transform  = "";
+
+        // Mirror alignment within the preview area
+        var align = textAlignInput.value;
+        if (boxExtraW > 0) {
+            var miniBoxW = boxExtraW * scaleX;
+            previewName.style.width   = miniBoxW + "px";
+            previewName.style.display = "flex";
+            previewName.style.justifyContent = align === "center" ? "center" : (align === "right" ? "flex-end" : "flex-start");
+        } else {
+            previewName.style.width   = "";
+            previewName.style.display = "";
+            previewName.style.justifyContent = "";
+        }
+    }
+
+    /* ── DRAG LOGIC ────────────────────────────────────────────── */
+    function startDrag(e) {
+        if (isResizing) return;
+        if (e.target.classList.contains("resize-handle")) return;
+        e.preventDefault();
+        isDragging = true;
+        placeholder.classList.add("dragging");
+
+        var cx = e.touches ? e.touches[0].clientX : e.clientX;
+        var cy = e.touches ? e.touches[0].clientY : e.clientY;
+        var phRect = placeholder.getBoundingClientRect();
+        dragOffsetX = cx - phRect.left;
+        dragOffsetY = cy - phRect.top;
+        hideHint();
+    }
+
+    function onMove(e) {
+        if (isDragging) {
+            e.preventDefault();
+            var cx = e.touches ? e.touches[0].clientX : e.clientX;
+            var cy = e.touches ? e.touches[0].clientY : e.clientY;
+            var imgRect = templateImg.getBoundingClientRect();
+            var dx = cx - imgRect.left - dragOffsetX;
+            var dy = cy - imgRect.top  - dragOffsetY;
+
+            // X,Y = top-left of the text area box (always)
+            var real = displayToReal(dx, dy);
+
+            // Snap: centre of the BOX to the image centre
+            var s = getScale();
+            var phRect = placeholder.getBoundingClientRect();
+            var phHalfW = Math.round((phRect.width / s.sx) / 2);
+            var phHalfH = Math.round((phRect.height / s.sy) / 2);
+            var centerXReal = Math.round(naturalW / 2);
+            var centerYReal = Math.round(naturalH / 2);
+            var snapThresholdReal = Math.round(SNAP_PX / s.sx);
+
+            if (Math.abs(real.x + phHalfW - centerXReal) < snapThresholdReal) {
+                real.x = centerXReal - phHalfW;
+            }
+            if (Math.abs(real.y + phHalfH - centerYReal) < snapThresholdReal) {
+                real.y = centerYReal - phHalfH;
+            }
+
+            realX = real.x;
+            realY = real.y;
+            updateAllViews();
+        }
+        if (isResizing) {
+            e.preventDefault();
+            var mx = e.touches ? e.touches[0].clientX : e.clientX;
+            var my = e.touches ? e.touches[0].clientY : e.clientY;
+            var s3 = getScale();
+            var deltaX = mx - resizeStartMX;
+            var deltaY = my - resizeStartMY;
+
+            if (resizeAxis === "r" || resizeAxis === "br") {
+                boxExtraW = Math.max(30, resizeStartW + deltaX / s3.sx);
+            }
+            if (resizeAxis === "b" || resizeAxis === "br") {
+                boxExtraH = Math.max(20, resizeStartH + deltaY / s3.sy);
+            }
+            updateAllViews();
+        }
+    }
+
+    function endDrag() {
+        if (isDragging) { isDragging = false; placeholder.classList.remove("dragging"); }
+        if (isResizing) { isResizing = false; }
+    }
+
+    function hideHint() {
+        if (!hintHidden) { canvasHint.classList.add("hidden"); hintHidden = true; }
+    }
+
+    /* ── RESIZE LOGIC ──────────────────────────────────────────── */
+    function startResize(axis, e) {
+        e.preventDefault();
+        e.stopPropagation();
+        isResizing = true;
+        resizeAxis = axis;
+        resizeStartMX = e.touches ? e.touches[0].clientX : e.clientX;
+        resizeStartMY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        var s = getScale();
+        var phRect = placeholder.getBoundingClientRect();
+        resizeStartW = boxExtraW > 0 ? boxExtraW : phRect.width / s.sx;
+        resizeStartH = boxExtraH > 0 ? boxExtraH : phRect.height / s.sy;
+        hideHint();
+    }
+
+    resizeR.addEventListener("mousedown",  function(e) { startResize("r", e); });
+    resizeB.addEventListener("mousedown",  function(e) { startResize("b", e); });
+    resizeBR.addEventListener("mousedown", function(e) { startResize("br", e); });
+    resizeR.addEventListener("touchstart",  function(e) { startResize("r", e); },  { passive: false });
+    resizeB.addEventListener("touchstart",  function(e) { startResize("b", e); },  { passive: false });
+    resizeBR.addEventListener("touchstart", function(e) { startResize("br", e); }, { passive: false });
+
+    /* ── CLICK-TO-PLACE ────────────────────────────────────────── */
+    container.addEventListener("click", function (e) {
+        if (isDragging || isResizing) return;
+        if (placeholder.contains(e.target)) return;
+        var imgRect = templateImg.getBoundingClientRect();
+        var real = displayToReal(e.clientX - imgRect.left, e.clientY - imgRect.top);
+        realX = real.x; realY = real.y;
+        updateAllViews();
+        hideHint();
+    });
+
+    /* ── MOUSE & TOUCH EVENTS ──────────────────────────────────── */
+    placeholder.addEventListener("mousedown", startDrag);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", endDrag);
+    placeholder.addEventListener("touchstart", startDrag, { passive: false });
+    document.addEventListener("touchmove", onMove, { passive: false });
+    document.addEventListener("touchend", endDrag);
+
+    /* ── SIDEBAR CONTROLS ──────────────────────────────────────── */
+    fontRange.addEventListener("input", function () {
+        fontHidden.value = this.value;
+        fontDisplay.textContent = this.value + "pt";
+        boxExtraW = 0; boxExtraH = 0;
+        updateAllViews();
+    });
+    fontColor.addEventListener("input",  function () { updateAllViews(); });
+    fontFamily.addEventListener("change", function () {
+        boxExtraW = 0; boxExtraH = 0;
+        updateAllViews();
+    });
+
+    // Alignment buttons
+    alignBtns.forEach(function (btn) {
+        btn.addEventListener("click", function () {
+            alignBtns.forEach(function (b) { b.classList.remove("active"); });
+            btn.classList.add("active");
+            textAlignInput.value = btn.getAttribute("data-align");
+            updateAllViews();
+        });
+    });
+
+    window.addEventListener("resize", function () { updateAllViews(); });
+    previewMini.querySelector("img").addEventListener("load", updateMiniPreview);
+
+})();
+</script>
+{% endblock %}

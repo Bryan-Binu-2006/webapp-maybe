@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Error — CertIssuer{% endblock %}
+
+{% block content %}
+<!--
+  errors.html — Generic error page
+  ==================================
+  SECURITY NOTES:
+  - We NEVER show stack traces or internal error details
+    to the user.  This prevents information leakage that
+    could help an attacker understand our codebase.
+  - The error code and a friendly message are all we reveal.
+-->
+<div class="error-container">
+    <h1>{{ error_code | default('Error') }}</h1>
+    <p>{{ error_message | default('Something went wrong.') }}</p>
+    <a href="{{ url_for('certificates.dashboard') if session.get('user_id') else url_for('auth.login') }}"
+       class="btn btn-primary">
+        Go Home
+    </a>
+</div>
+{% endblock %}

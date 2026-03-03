@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — CertIssuer{% endblock %}
+
+{% block content %}
+<!--
+  dashboard.html — User's certificate batch listing
+  ===================================================
+  Shows all batches created by the current user.
+  Each batch links to its detail page.
+-->
+<div class="dashboard">
+    <div class="page-header">
+        <h1>Your Certificate Batches</h1>
+        <div style="display:flex;gap:0.5rem;">
+            <a href="{{ url_for('certificates.dashboard') }}" class="btn">Refresh</a>
+            <a href="{{ url_for('certificates.upload') }}" class="btn btn-primary">
+                + New Batch
+            </a>
+        </div>
+    </div>
+
+    {% if batches %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Batch ID</th>
+                    <th>Template</th>
+                    <th>Certificates</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for batch in batches %}
+                <tr>
+                    <td class="mono">{{ batch.id | string | truncate(8, True, '') }}</td>
+                    <td>{{ batch.template_filename }}</td>
+                    <td>{{ batch.certificates.count() }}</td>
+                    <td>{{ batch.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>
+                        <a href="{{ url_for('certificates.view_batch', batch_id=batch.id) }}"
+                           class="btn btn-small">View</a>
+                        <form method="POST"
+                              action="{{ url_for('certificates.delete_batch', batch_id=batch.id) }}"
+                              style="display:inline;"
+                              onsubmit="return confirm('Delete all certificate files in this batch? Verification records will be preserved.')">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <button type="submit" class="btn btn-small btn-danger">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="empty-state">
+            <p>You haven't created any certificate batches yet.</p>
+            <a href="{{ url_for('certificates.upload') }}" class="btn btn-primary">
+                Create your first batch
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
