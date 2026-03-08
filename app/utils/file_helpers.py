@@ -17,7 +17,6 @@ PRINCIPLES:
 import os
 import uuid
 import logging
-import imghdr
 
 from werkzeug.utils import secure_filename
 
@@ -57,15 +56,19 @@ def validate_image(file_path: str) -> bool:
     WHY:
     - An attacker can rename malware.exe → malware.png.
     - Checking the extension alone is not sufficient.
-    - imghdr reads the first few bytes and returns 'png' only
-      if the PNG signature (\\x89PNG) is present.
+    - We compare against the exact PNG file signature.
     """
-    detected = imghdr.what(file_path)
-    if detected != "png":
+    png_signature = b"\x89PNG\r\n\x1a\n"
+    try:
+        with open(file_path, "rb") as f:
+            header = f.read(8)
+    except OSError:
+        return False
+
+    if header != png_signature:
         logger.warning(
-            "Image validation failed for %s: detected type '%s'",
+            "Image validation failed for %s: invalid PNG signature",
             file_path,
-            detected,
         )
         return False
     return True
